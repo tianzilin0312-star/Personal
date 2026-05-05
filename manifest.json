@@ -1,0 +1,16 @@
+{
+  "name": "Meal Basket",
+  "short_name": "Meal Basket",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#fff5d7",
+  "theme_color": "#fff5d7",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
