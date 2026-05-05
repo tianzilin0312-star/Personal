@@ -17,6 +17,7 @@
         <div>
           <p class="eyebrow">weekly grocery helper</p>
           <h1>Meal Basket</h1>
+          <p class="sync-status" id="sync-status">Saved on this device</p>
         </div>
         <div class="plate-art" aria-hidden="true">
           <svg viewBox="0 0 120 120" role="img">
@@ -38,6 +39,22 @@
       </nav>
 
       <main>
+        <section class="backup-panel" id="backup-panel">
+          <div>
+            <strong id="auth-title">Sign in for sync</strong>
+            <p id="auth-detail">Recipes update across your phone and computer.</p>
+          </div>
+          <div class="backup-actions">
+            <button class="ghost-button" type="button" id="sign-in">Sign In</button>
+            <button class="plain-button" type="button" id="sign-out" hidden>Sign Out</button>
+            <button class="ghost-button" type="button" id="export-backup">Export CSV</button>
+            <label class="plain-file-button">
+              Import CSV
+              <input type="file" id="import-backup" accept=".csv,text/csv">
+            </label>
+          </div>
+        </section>
+
         <section class="view is-active" id="recipes" aria-labelledby="recipes-title">
           <div class="panel intro-panel">
             <div>
@@ -99,6 +116,6 @@
       </main>
     </div>
 
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>

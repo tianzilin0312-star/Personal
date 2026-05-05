@@ -153,8 +153,41 @@ p {
 }
 
 .intro-panel p,
-.copy-status {
+.copy-status,
+.sync-status,
+.backup-panel p {
   margin-bottom: 0;
+}
+
+.sync-status {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 850;
+}
+
+.backup-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 254, 249, 0.92);
+  box-shadow: 0 8px 18px rgba(88, 62, 31, 0.08);
+}
+
+.backup-panel strong {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.backup-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
 }
 
 .recipe-form {
@@ -231,6 +264,25 @@ textarea:focus {
 .plain-button {
   background: transparent;
   color: var(--muted);
+}
+
+.plain-file-button {
+  min-height: 44px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.plain-file-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .full-width {
@@ -471,5 +523,15 @@ textarea:focus {
 
   .intro-panel {
     align-items: flex-start;
+  }
+
+  .backup-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .backup-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 }

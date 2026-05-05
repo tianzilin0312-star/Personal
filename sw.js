@@ -1,5 +1,13 @@
 const cacheName = "meal-basket-v1";
-const filesToCache = ["./", "index.html", "style.css", "app.js", "manifest.json", "icons/icon.svg"];
+const filesToCache = [
+  "./",
+  "index.html",
+  "style.css",
+  "app.js",
+  "firebase-config.js",
+  "manifest.json",
+  "icons/icon.svg",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(cacheName).then((cache) => cache.addAll(filesToCache)));

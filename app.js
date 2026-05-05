@@ -1,4 +1,23 @@
+import { firebaseConfig } from "./firebase-config.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import {
+  GoogleAuthProvider,
+  getAuth,
+  onAuthStateChanged,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut as firebaseSignOut,
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+import {
+  doc,
+  enableIndexedDbPersistence,
+  getFirestore,
+  onSnapshot,
+  setDoc,
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
 const storeKey = "meal-basket-v1";
+const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId);
 
 const sampleRecipes = [
   {
@@ -24,6 +43,13 @@ let state = {
   editingRecipeId: null,
 };
 
+let auth;
+let db;
+let currentUser = null;
+let unsubscribeFromCloud = null;
+let saveTimer = null;
+let applyingCloudState = false;
+
 const views = document.querySelectorAll(".view");
 const tabButtons = document.querySelectorAll("[data-view-button]");
 const recipeForm = document.querySelector("#recipe-form");
@@ -41,9 +67,17 @@ const emptyGrocery = document.querySelector("#empty-grocery");
 const ingredientCount = document.querySelector("#ingredient-count");
 const copyList = document.querySelector("#copy-list");
 const copyStatus = document.querySelector("#copy-status");
+const syncStatus = document.querySelector("#sync-status");
+const authTitle = document.querySelector("#auth-title");
+const authDetail = document.querySelector("#auth-detail");
+const signIn = document.querySelector("#sign-in");
+const signOut = document.querySelector("#sign-out");
+const exportBackup = document.querySelector("#export-backup");
+const importBackup = document.querySelector("#import-backup");
 
 function saveState() {
   localStorage.setItem(storeKey, JSON.stringify(state));
+  saveCloudState();
 }
 
 function loadState() {
@@ -62,6 +96,108 @@ function loadState() {
   }
 }
 
+function setSyncStatus(message) {
+  syncStatus.textContent = message;
+}
+
+function userDoc() {
+  return doc(db, "users", currentUser.uid, "appState", "mealBasket");
+}
+
+function cloudPayload() {
+  return {
+    recipes: state.recipes,
+    selectedRecipeIds: state.selectedRecipeIds,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function saveCloudState() {
+  if (applyingCloudState) return;
+
+  if (!currentUser || !db) {
+    setSyncStatus("Saved on this device");
+    return;
+  }
+
+  window.clearTimeout(saveTimer);
+  setSyncStatus("Saving...");
+  saveTimer = window.setTimeout(async () => {
+    try {
+      await setDoc(userDoc(), cloudPayload());
+      setSyncStatus("Synced");
+    } catch {
+      setSyncStatus("Saved on this device. Sync failed.");
+    }
+  }, 350);
+}
+
+function setupFirebase() {
+  if (!isFirebaseConfigured) {
+    authTitle.textContent = "Sync is not connected";
+    authDetail.textContent = "Add Firebase settings once, then sign in on each device.";
+    signIn.hidden = true;
+    signOut.hidden = true;
+    setSyncStatus("Saved on this device");
+    return;
+  }
+
+  const app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  enableIndexedDbPersistence(db).catch(() => {});
+
+  onAuthStateChanged(auth, (user) => {
+    currentUser = user;
+    if (unsubscribeFromCloud) unsubscribeFromCloud();
+    unsubscribeFromCloud = null;
+
+    if (!user) {
+      authTitle.textContent = "Sign in for sync";
+      authDetail.textContent = "Recipes update across your phone and computer.";
+      signIn.hidden = false;
+      signOut.hidden = true;
+      setSyncStatus("Saved on this device");
+      return;
+    }
+
+    authTitle.textContent = user.displayName || "Sync is on";
+    authDetail.textContent = user.email || "Signed in";
+    signIn.hidden = true;
+    signOut.hidden = false;
+    setSyncStatus("Loading synced recipes...");
+
+    unsubscribeFromCloud = onSnapshot(
+      userDoc(),
+      async (snapshot) => {
+        if (!snapshot.exists()) {
+          if (state.recipes.length || state.selectedRecipeIds.length) {
+            await setDoc(userDoc(), cloudPayload());
+          }
+          setSyncStatus("Synced");
+          return;
+        }
+
+        const data = snapshot.data();
+        applyingCloudState = true;
+        state = {
+          recipes: Array.isArray(data.recipes) ? data.recipes : [],
+          selectedRecipeIds: Array.isArray(data.selectedRecipeIds) ? data.selectedRecipeIds : [],
+          editingRecipeId: null,
+        };
+        localStorage.setItem(storeKey, JSON.stringify(state));
+        applyingCloudState = false;
+        resetForm();
+        render();
+        setSyncStatus("Synced");
+      },
+      () => {
+        setSyncStatus("Saved on this device. Sync failed.");
+      }
+    );
+  });
+}
+
 function cleanIngredientLines(value) {
   const seen = new Set();
 
@@ -75,6 +211,101 @@ function cleanIngredientLines(value) {
       seen.add(key);
       return true;
     });
+}
+
+function csvEscape(value) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function recipesToCsv() {
+  const rows = [["recipe", "ingredient"]];
+
+  state.recipes.forEach((recipe) => {
+    recipe.ingredients.forEach((ingredient) => {
+      rows.push([recipe.name, ingredient]);
+    });
+  });
+
+  return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      row.push(cell.trim());
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(cell.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+
+  row.push(cell.trim());
+  if (row.some(Boolean)) rows.push(row);
+  return rows;
+}
+
+function recipesFromCsv(text) {
+  const rows = parseCsv(text);
+  const dataRows = rows[0]?.[0]?.toLowerCase() === "recipe" ? rows.slice(1) : rows;
+  const recipes = new Map();
+
+  dataRows.forEach(([name, ingredient]) => {
+    if (!name || !ingredient) return;
+    const key = name.trim().toLowerCase();
+
+    if (!recipes.has(key)) {
+      recipes.set(key, {
+        id: crypto.randomUUID(),
+        name: name.trim(),
+        ingredients: [],
+      });
+    }
+
+    const recipe = recipes.get(key);
+    const cleanIngredient = ingredient.trim();
+    const alreadyAdded = recipe.ingredients.some(
+      (existing) => normalizeIngredient(existing) === normalizeIngredient(cleanIngredient)
+    );
+
+    if (!alreadyAdded) recipe.ingredients.push(cleanIngredient);
+  });
+
+  return [...recipes.values()].filter((recipe) => recipe.ingredients.length);
+}
+
+async function loadRepoCsvIfNeeded() {
+  if (state.recipes.length) return;
+
+  try {
+    const response = await fetch("recipes.csv", { cache: "no-store" });
+    if (!response.ok) return;
+    const recipes = recipesFromCsv(await response.text());
+    if (!recipes.length) return;
+    state.recipes = recipes;
+    saveState();
+  } catch {
+    setSyncStatus("Saved on this device");
+  }
 }
 
 function normalizeIngredient(ingredient) {
@@ -319,6 +550,52 @@ copyList.addEventListener("click", async () => {
   }
 });
 
+exportBackup.addEventListener("click", () => {
+  const blob = new Blob([recipesToCsv()], { type: "text/csv;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "meal-basket-recipes.csv";
+  link.click();
+  URL.revokeObjectURL(link.href);
+  setSyncStatus("CSV backup exported");
+});
+
+importBackup.addEventListener("change", async () => {
+  const file = importBackup.files?.[0];
+  if (!file) return;
+
+  const importedRecipes = recipesFromCsv(await file.text());
+  importBackup.value = "";
+
+  if (!importedRecipes.length) {
+    setSyncStatus("No recipes found in that CSV");
+    return;
+  }
+
+  state.recipes = importedRecipes;
+  state.selectedRecipeIds = state.selectedRecipeIds.filter((id) => state.recipes.some((recipe) => recipe.id === id));
+  resetForm();
+  saveState();
+  render();
+  setSyncStatus(currentUser ? "Imported. Syncing..." : "CSV backup imported");
+});
+
+signIn.addEventListener("click", async () => {
+  if (!auth) return;
+  const provider = new GoogleAuthProvider();
+
+  try {
+    await signInWithPopup(auth, provider);
+  } catch {
+    await signInWithRedirect(auth, provider);
+  }
+});
+
+signOut.addEventListener("click", async () => {
+  if (!auth) return;
+  await firebaseSignOut(auth);
+});
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -326,4 +603,5 @@ if ("serviceWorker" in navigator) {
 }
 
 loadState();
-render();
+setupFirebase();
+loadRepoCsvIfNeeded().finally(render);
