@@ -69,6 +69,7 @@ const authTitle = document.querySelector("#auth-title");
 const authDetail = document.querySelector("#auth-detail");
 const email = document.querySelector("#email");
 const password = document.querySelector("#password");
+const togglePassword = document.querySelector("#toggle-password");
 const loginFields = document.querySelector("#login-fields");
 const signIn = document.querySelector("#sign-in");
 const exportBackup = document.querySelector("#export-backup");
@@ -584,6 +585,14 @@ importBackup.addEventListener("change", async () => {
   saveState();
   render();
   setSyncStatus(currentUser ? "Imported. Syncing..." : "CSV backup imported");
+});
+
+togglePassword.addEventListener("click", () => {
+  const isVisible = password.type === "text";
+  password.type = isVisible ? "password" : "text";
+  togglePassword.textContent = isVisible ? "Show" : "Hide";
+  togglePassword.setAttribute("aria-label", isVisible ? "Show password" : "Hide password");
+  togglePassword.setAttribute("aria-pressed", String(!isVisible));
 });
 
 signIn.addEventListener("click", async () => {
