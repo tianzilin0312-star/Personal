@@ -188,6 +188,20 @@ p {
   display: flex;
   flex: 0 0 auto;
   gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.login-fields {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(120px, 0.8fr);
+  gap: 8px;
+}
+
+.login-fields input {
+  min-height: 44px;
+  border-width: 1px;
 }
 
 .recipe-form {
@@ -533,5 +547,10 @@ textarea:focus {
   .backup-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
+  }
+
+  .login-fields {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
   }
 }

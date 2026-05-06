@@ -1,12 +1,9 @@
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
-  GoogleAuthProvider,
   getAuth,
   onAuthStateChanged,
-  signInWithPopup,
-  signInWithRedirect,
-  signOut as firebaseSignOut,
+  signInWithEmailAndPassword,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import {
   doc,
@@ -70,8 +67,10 @@ const copyStatus = document.querySelector("#copy-status");
 const syncStatus = document.querySelector("#sync-status");
 const authTitle = document.querySelector("#auth-title");
 const authDetail = document.querySelector("#auth-detail");
+const email = document.querySelector("#email");
+const password = document.querySelector("#password");
+const loginFields = document.querySelector("#login-fields");
 const signIn = document.querySelector("#sign-in");
-const signOut = document.querySelector("#sign-out");
 const exportBackup = document.querySelector("#export-backup");
 const importBackup = document.querySelector("#import-backup");
 
@@ -135,9 +134,8 @@ function saveCloudState() {
 function setupFirebase() {
   if (!isFirebaseConfigured) {
     authTitle.textContent = "Sync is not connected";
-    authDetail.textContent = "Add Firebase settings once, then sign in on each device.";
-    signIn.hidden = true;
-    signOut.hidden = true;
+    authDetail.textContent = "Paste your Firebase settings into firebase-config.js first.";
+    signIn.disabled = true;
     setSyncStatus("Saved on this device");
     return;
   }
@@ -155,16 +153,16 @@ function setupFirebase() {
     if (!user) {
       authTitle.textContent = "Sign in for sync";
       authDetail.textContent = "Recipes update across your phone and computer.";
+      loginFields.hidden = false;
       signIn.hidden = false;
-      signOut.hidden = true;
       setSyncStatus("Saved on this device");
       return;
     }
 
     authTitle.textContent = user.displayName || "Sync is on";
     authDetail.textContent = user.email || "Signed in";
+    loginFields.hidden = true;
     signIn.hidden = true;
-    signOut.hidden = false;
     setSyncStatus("Loading synced recipes...");
 
     unsubscribeFromCloud = onSnapshot(
@@ -582,19 +580,31 @@ importBackup.addEventListener("change", async () => {
 
 signIn.addEventListener("click", async () => {
   if (!auth) return;
-  const provider = new GoogleAuthProvider();
+  const emailValue = email.value.trim();
+  const passwordValue = password.value;
+
+  if (!emailValue || !passwordValue) {
+    setSyncStatus("Enter email and password");
+    return;
+  }
 
   try {
-    await signInWithPopup(auth, provider);
-  } catch {
-    await signInWithRedirect(auth, provider);
+    await signInWithEmailAndPassword(auth, emailValue, passwordValue);
+  } catch (error) {
+    setSyncStatus(readableAuthError(error));
   }
 });
 
-signOut.addEventListener("click", async () => {
-  if (!auth) return;
-  await firebaseSignOut(auth);
-});
+function readableAuthError(error) {
+  const code = error?.code || "";
+  if (code.includes("invalid-credential") || code.includes("wrong-password")) return "Email or password is incorrect";
+  if (code.includes("user-not-found")) return "No account found. Add the user in Firebase Console.";
+  if (code.includes("email-already-in-use")) return "Account already exists. Try Sign In.";
+  if (code.includes("weak-password")) return "Use a password with at least 6 characters";
+  if (code.includes("invalid-email")) return "Enter a valid email address";
+  if (code.includes("operation-not-allowed")) return "Enable Email/Password in Firebase Authentication";
+  return "Sign-in failed";
+}
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

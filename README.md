@@ -7,6 +7,7 @@ A tiny personal meal-planning web app for iPhone:
 - Generate one deduped grocery list.
 - Copy the grocery list into Messages, Notes, Reminders, or anywhere else.
 - Sync recipes and weekly selections across phone and computer with Firebase Firestore.
+- Sign in with email/password. No Google sign-in is required.
 - Keep a device copy with `localStorage` as a fallback.
 - Export and import a plain CSV backup if you ever want a manual copy.
 - Optionally keep a starter `recipes.csv` file in the GitHub repo.
@@ -24,10 +25,11 @@ The CSV feature is only a backup/import tool.
 3. Copy the Firebase config values.
 4. Paste those values into `firebase-config.js`.
 5. In Firebase, enable **Authentication**.
-6. Add **Google** as a sign-in provider.
-7. In Firebase, enable **Cloud Firestore**.
-8. Start Firestore in production mode.
-9. Add your GitHub Pages domain to Firebase Authentication's authorized domains.
+6. Add **Email/Password** as a sign-in provider.
+7. In **Authentication > Users**, add your own user manually.
+8. In Firebase, enable **Cloud Firestore**.
+9. Start Firestore in production mode.
+10. Add your GitHub Pages domain to Firebase Authentication's authorized domains.
 
 Use these Firestore security rules:
 
