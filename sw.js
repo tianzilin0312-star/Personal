@@ -1,4 +1,4 @@
-const cacheName = "meal-basket-v1";
+const cacheName = "meal-basket-v2";
 const filesToCache = [
   "./",
   "index.html",
@@ -6,6 +6,7 @@ const filesToCache = [
   "app.js",
   "firebase-config.js",
   "manifest.json",
+  "recipes.csv",
   "icons/icon.svg",
 ];
 

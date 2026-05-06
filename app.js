@@ -140,10 +140,18 @@ function setupFirebase() {
     return;
   }
 
-  const app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  enableIndexedDbPersistence(db).catch(() => {});
+  try {
+    const app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    enableIndexedDbPersistence(db).catch(() => {});
+  } catch (error) {
+    authTitle.textContent = "Sync could not start";
+    authDetail.textContent = "Firebase did not initialize. Check the config and browser console.";
+    signIn.disabled = true;
+    setSyncStatus(readableFirebaseError(error));
+    return;
+  }
 
   onAuthStateChanged(auth, (user) => {
     currentUser = user;
@@ -579,7 +587,10 @@ importBackup.addEventListener("change", async () => {
 });
 
 signIn.addEventListener("click", async () => {
-  if (!auth) return;
+  if (!auth) {
+    setSyncStatus("Firebase is not ready yet");
+    return;
+  }
   const emailValue = email.value.trim();
   const passwordValue = password.value;
 
@@ -589,6 +600,7 @@ signIn.addEventListener("click", async () => {
   }
 
   try {
+    setSyncStatus("Signing in...");
     await signInWithEmailAndPassword(auth, emailValue, passwordValue);
   } catch (error) {
     setSyncStatus(readableAuthError(error));
@@ -603,7 +615,19 @@ function readableAuthError(error) {
   if (code.includes("weak-password")) return "Use a password with at least 6 characters";
   if (code.includes("invalid-email")) return "Enter a valid email address";
   if (code.includes("operation-not-allowed")) return "Enable Email/Password in Firebase Authentication";
+  if (code.includes("unauthorized-domain")) return "Add this website domain in Firebase Authentication settings";
+  if (code.includes("configuration-not-found")) return "Firebase Auth is not set up for this project";
+  if (code.includes("api-key-not-valid")) return "Firebase API key is not valid";
+  if (code.includes("app-not-authorized")) return "Add this app domain in Firebase Authentication settings";
+  if (code.includes("network-request-failed")) return "Network blocked Firebase. Check internet or content blockers.";
   return "Sign-in failed";
+}
+
+function readableFirebaseError(error) {
+  const message = error?.message || "";
+  if (message.includes("Failed to resolve module specifier")) return "Firebase imports are not loading";
+  if (message.includes("Firebase App named")) return "Firebase app setup conflicted";
+  return "Firebase setup failed";
 }
 
 if ("serviceWorker" in navigator) {
