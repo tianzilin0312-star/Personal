@@ -321,22 +321,31 @@ function normalizeIngredient(ingredient) {
 
 function uniqueGroceries() {
   const selected = new Set(state.selectedRecipeIds);
-  const groceries = [];
-  const seen = new Set();
+  const groceries = new Map();
 
   state.recipes
     .filter((recipe) => selected.has(recipe.id))
     .forEach((recipe) => {
+      const recipeIngredients = new Set();
+
       recipe.ingredients.forEach((ingredient) => {
         const key = normalizeIngredient(ingredient);
-        if (!seen.has(key)) {
-          seen.add(key);
-          groceries.push(ingredient);
+        if (!groceries.has(key)) {
+          groceries.set(key, { ingredient, count: 0 });
         }
+        recipeIngredients.add(key);
+      });
+
+      recipeIngredients.forEach((key) => {
+        groceries.get(key).count += 1;
       });
     });
 
-  return groceries.sort((a, b) => a.localeCompare(b));
+  return [...groceries.values()].sort((a, b) => a.ingredient.localeCompare(b.ingredient));
+}
+
+function groceryLabel(grocery) {
+  return grocery.count > 1 ? `${grocery.ingredient} (${grocery.count})` : grocery.ingredient;
 }
 
 function foodBadge(name) {
@@ -430,7 +439,7 @@ function renderMeals() {
 function renderGroceries() {
   const groceries = uniqueGroceries();
   ingredientCount.textContent = `${groceries.length} ${groceries.length === 1 ? "item" : "items"}`;
-  groceryList.innerHTML = groceries.map((ingredient) => `<li>${escapeHtml(ingredient)}</li>`).join("");
+  groceryList.innerHTML = groceries.map((grocery) => `<li>${escapeHtml(groceryLabel(grocery))}</li>`).join("");
   emptyGrocery.classList.toggle("hidden", groceries.length > 0);
   copyList.disabled = groceries.length === 0;
 }
@@ -546,7 +555,7 @@ loadSample.addEventListener("click", () => {
 
 copyList.addEventListener("click", async () => {
   const groceries = uniqueGroceries();
-  const text = groceries.join("\n");
+  const text = groceries.map(groceryLabel).join("\n");
   if (!text) return;
 
   try {
